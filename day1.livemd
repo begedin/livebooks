@@ -1,0 +1,39 @@
+# day-1
+
+```elixir
+Mix.install([
+  {:kino, "~> 0.7.0"}
+])
+```
+
+## Section
+
+```elixir
+input = Kino.Input.textarea("Input")
+```
+
+```elixir
+# the elf with the most has
+input
+|> Kino.Input.read()
+|> String.split("\n\n")
+|> Enum.map(&String.split(&1, "\n"))
+|> Enum.map(fn chunk -> Enum.map(chunk, &String.to_integer/1) end)
+|> Enum.map(&Enum.sum/1)
+# calories
+|> Enum.max()
+```
+
+```elixir
+# the three elves with the most have
+input
+|> Kino.Input.read()
+|> String.split("\n\n")
+|> Enum.map(&String.split(&1, "\n"))
+|> Enum.map(fn chunk -> Enum.map(chunk, &String.to_integer/1) end)
+|> Enum.map(&Enum.sum/1)
+|> Enum.sort()
+|> Enum.take(-3)
+# calories total
+|> Enum.sum()
+```
