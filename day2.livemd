@@ -1,0 +1,91 @@
+# day2
+
+```elixir
+Mix.install([
+  {:kino, "~> 0.7.0"}
+])
+```
+
+## Section
+
+```elixir
+input = Kino.Input.textarea("Input")
+```
+
+```elixir
+defmodule RPS do
+  def decode_move("A"), do: "Rock"
+  def decode_move("B"), do: "Paper"
+  def decode_move("C"), do: "Scisors"
+  def decode_move("X"), do: "Rock"
+  def decode_move("Y"), do: "Paper"
+  def decode_move("Z"), do: "Scisors"
+
+  def play("Rock", "Rock"), do: 3
+  def play("Rock", "Paper"), do: 6
+  def play("Rock", "Scisors"), do: 0
+  def play("Paper", "Rock"), do: 0
+  def play("Paper", "Paper"), do: 3
+  def play("Paper", "Scisors"), do: 6
+  def play("Scisors", "Rock"), do: 6
+  def play("Scisors", "Paper"), do: 0
+  def play("Scisors", "Scisors"), do: 3
+
+  def score_move("Rock"), do: 1
+  def score_move("Paper"), do: 2
+  def score_move("Scisors"), do: 3
+end
+
+input
+|> Kino.Input.read()
+|> String.split("\n")
+|> Enum.map(fn row ->
+  [oponent, me] = String.split(row, " ")
+  oponent_move = RPS.decode_move(oponent)
+  me_move = RPS.decode_move(me)
+  RPS.play(oponent_move, me_move) + RPS.score_move(me_move)
+end)
+|> Enum.sum()
+```
+
+```elixir
+defmodule RPS2 do
+  def decode_move("A"), do: "Rock"
+  def decode_move("B"), do: "Paper"
+  def decode_move("C"), do: "Scisors"
+
+  def decode_outcome("X"), do: :lose
+  def decode_outcome("Y"), do: :draw
+  def decode_outcome("Z"), do: :win
+
+  def score_outcome(:lose), do: 0
+  def score_outcome(:win), do: 6
+  def score_outcome(:draw), do: 3
+
+  def get_move("Rock", :lose), do: "Scisors"
+  def get_move("Rock", :win), do: "Paper"
+  def get_move("Rock", :draw), do: "Rock"
+  def get_move("Paper", :lose), do: "Rock"
+  def get_move("Paper", :win), do: "Scisors"
+  def get_move("Paper", :draw), do: "Paper"
+  def get_move("Scisors", :lose), do: "Paper"
+  def get_move("Scisors", :win), do: "Rock"
+  def get_move("Scisors", :draw), do: "Scisors"
+
+  def score_move("Rock"), do: 1
+  def score_move("Paper"), do: 2
+  def score_move("Scisors"), do: 3
+end
+
+input
+|> Kino.Input.read()
+|> String.split("\n")
+|> Enum.map(fn row ->
+  [oponent, outcome] = String.split(row, " ")
+  oponent_move = RPS2.decode_move(oponent)
+  outcome = RPS2.decode_outcome(outcome)
+  move = RPS2.get_move(oponent_move, outcome)
+  RPS2.score_outcome(outcome) + RPS.score_move(move)
+end)
+|> Enum.sum()
+```
