@@ -1,4 +1,4 @@
-# day2
+# day-2
 
 ```elixir
 Mix.install([
