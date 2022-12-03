@@ -1,0 +1,69 @@
+# day-3
+
+```elixir
+Mix.install([
+  {:kino, "~> 0.7.0"}
+])
+```
+
+## Section
+
+```elixir
+input = Kino.Input.textarea("Data")
+```
+
+```elixir
+letters = ~w(a b c d e f g h i j k l m n o p q r s t u v w x y z)
+upcase_letters = Enum.map(letters, &String.upcase/1)
+
+priorities =
+  letters
+  |> Enum.concat(upcase_letters)
+  |> Enum.with_index()
+  |> Enum.map(fn {letter, index} -> {letter, index + 1} end)
+  |> Map.new()
+```
+
+```elixir
+rucksacks =
+  input
+  |> Kino.Input.read()
+  |> String.split("\n")
+  |> Enum.map(&String.split(&1, ""))
+  |> Enum.map(&Enum.reject(&1, fn letter -> letter == "" end))
+```
+
+## Part 1
+
+```elixir
+rucksacks
+|> Enum.map(fn rucksack ->
+  size = rucksack |> Enum.count() |> Kernel./(2) |> Kernel.floor()
+  {compartment_a, compartment_b} = Enum.split(rucksack, size)
+
+  compartment_a
+  |> Enum.filter(fn item ->
+    Enum.any?(compartment_b, &(&1 == item))
+  end)
+  |> Enum.uniq()
+  |> Enum.map(&priorities[&1])
+end)
+|> List.flatten()
+|> Enum.sum()
+```
+
+## Part 2
+
+```elixir
+rucksacks
+|> Enum.chunk_every(3)
+|> Enum.map(fn [r_1, r_2, r_3] ->
+  r_1
+  |> Enum.find(fn item ->
+    Enum.any?(r_2, &(&1 == item)) and
+      Enum.any?(r_3, &(&1 == item))
+  end)
+end)
+|> Enum.map(&priorities[&1])
+|> Enum.sum()
+```
