@@ -1,0 +1,86 @@
+# day-5
+
+```elixir
+Mix.install([
+  {:kino, "~> 0.7.0"}
+])
+```
+
+## Input
+
+```elixir
+input = Kino.Input.textarea("Data")
+```
+
+## Read input
+
+```elixir
+[data, moves] =
+  input
+  |> Kino.Input.read()
+  |> String.split("\n\n")
+
+[header | data] =
+  data
+  |> String.split(["\n"])
+  |> Enum.reverse()
+
+stacks =
+  header
+  |> String.split(" ", trim: true)
+  |> Enum.map(&String.to_integer/1)
+  |> Enum.map(fn index ->
+    data =
+      data
+      |> Enum.map(&String.at(&1, (index - 1) * 3 + index))
+      |> Enum.reject(&(&1 == " "))
+
+    {index, data}
+  end)
+  |> Map.new()
+
+moves =
+  moves
+  |> String.split("\n")
+  |> Enum.map(&String.split(&1, ["move ", " from ", " to "], trim: true))
+  |> Enum.map(fn moves -> Enum.map(moves, &String.to_integer/1) end)
+  |> Enum.map(&List.to_tuple/1)
+```
+
+## Part 1
+
+```elixir
+new_stacks =
+  Enum.reduce(moves, stacks, fn {amount, from, to}, acc ->
+    moved = acc[from] |> Enum.take(-amount) |> Enum.reverse()
+    from_stack = Enum.drop(acc[from], -amount)
+    to_stack = Enum.concat(acc[to], moved)
+
+    acc
+    |> Map.put(from, from_stack)
+    |> Map.put(to, to_stack)
+  end)
+
+new_stacks
+|> Enum.map(fn {_k, v} -> Enum.at(v, -1) end)
+|> Enum.join("")
+```
+
+## Part 2
+
+```elixir
+new_stacks =
+  Enum.reduce(moves, stacks, fn {amount, from, to}, acc ->
+    moved = Enum.take(acc[from], -amount)
+    from_stack = Enum.drop(acc[from], -amount)
+    to_stack = Enum.concat(acc[to], moved)
+
+    acc
+    |> Map.put(from, from_stack)
+    |> Map.put(to, to_stack)
+  end)
+
+new_stacks
+|> Enum.map(fn {_k, v} -> Enum.at(v, -1) end)
+|> Enum.join("")
+```
