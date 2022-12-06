@@ -1,0 +1,39 @@
+# day6
+
+```elixir
+Mix.install([
+  {:kino, "~> 0.7.0"}
+])
+```
+
+## Input
+
+```elixir
+input = Kino.Input.textarea("Data")
+```
+
+## Part 1
+
+Biggest difficulty here was figuring I actually need to add 4 at the end, because i'm reading the full current chunk. You don't really consider that fact when you're using `Enum.chunk_every/3`
+
+```elixir
+input
+|> Kino.Input.read()
+|> String.split("", trim: true)
+|> Enum.chunk_every(4, 1)
+|> Enum.find_index(&(&1 == Enum.uniq(&1)))
+|> Kernel.+(4)
+```
+
+## Part 2
+
+Somewhat disappointing part 2. All it took to do this in elixir was to change the chunk size.
+
+```elixir
+input
+|> Kino.Input.read()
+|> String.split("", trim: true)
+|> Enum.chunk_every(14, 1)
+|> Enum.find_index(&(&1 == Enum.uniq(&1)))
+|> Kernel.+(14)
+```
