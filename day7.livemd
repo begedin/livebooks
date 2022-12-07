@@ -1,0 +1,136 @@
+# day-7
+
+```elixir
+Mix.install([
+  {:kino, "~> 0.7.0"}
+])
+```
+
+## Input
+
+```elixir
+input = Kino.Input.textarea("Data")
+```
+
+## Build structure
+
+We parse the input into a tree structure of file information. Parsing commands is really easy with elixir's pattern matching.
+
+```elixir
+structure =
+  input
+  |> Kino.Input.read()
+  |> String.split("\n", trim: true)
+  |> Enum.reduce({%{"/" => %{"_files" => []}}, []}, fn
+    "$ cd ..", {data, current_dir} ->
+      {data, Enum.drop(current_dir, -1)}
+
+    "$ cd " <> subdir, {data, current_dir} ->
+      {data, current_dir ++ [subdir]}
+
+    "$ ls", acc ->
+      acc
+
+    "dir " <> folder, {data, current_dir} ->
+      {Kernel.put_in(data, current_dir ++ [folder], %{"_files" => []}), current_dir}
+
+    fileinfo, {data, current_dir} ->
+      [size, name] = String.split(fileinfo, " ", trim: true)
+      size = String.to_integer(size)
+      data = Kernel.update_in(data, current_dir ++ ["_files"], &(&1 ++ [{size, name}]))
+      {data, current_dir}
+  end)
+  |> Kernel.elem(0)
+```
+
+## Get sizes
+
+Once the basic structure is in, we build up size info on every folder in the tree by traversing it in a recursive reduce. Not the easiest to understand, but it works.
+
+<!-- livebook:{"break_markdown":true} -->
+
+We drop the root here. Cleaner would be not to, but we don't really need it for the solution.
+
+```elixir
+defmodule Folder do
+  def compute_size(%{"_files" => files} = folder) do
+    file_size =
+      folder
+      |> Map.get("_files")
+      |> Enum.map(&Kernel.elem(&1, 0))
+      |> Enum.sum()
+
+    new_dirs =
+      folder
+      |> Map.delete("_files")
+      |> Enum.map(fn
+        {folder_name, folder} -> {folder_name, compute_size(folder)}
+      end)
+      |> Map.new()
+
+    dir_size = new_dirs |> Enum.map(fn {_name, data} -> data["_size"] end) |> Enum.sum()
+
+    new_dirs
+    |> Map.put("_files", files)
+    |> Map.put("_size", file_size + dir_size)
+  end
+end
+
+size_info = Folder.compute_size(structure["/"])
+```
+
+## Part 1
+
+Once the input is parsed correctly, it was just a matter of reducing the structure.
+
+```elixir
+defmodule Sizer do
+  def get_size(data) do
+    Enum.reduce(data, 0, fn
+      {"_size", v}, total when v <= 100_000 -> total + v
+      {"_size", v}, total when v > 100_000 -> total
+      {"_files", _}, total -> total
+      {_folder_name, folder}, total -> total + get_size(folder)
+    end)
+  end
+end
+
+Sizer.get_size(size_info)
+```
+
+## Part 2
+
+I found it easier to debug if I first got all the folders big enough, with the associated path.
+
+```elixir
+defmodule Finder do
+  def find_dirs(data, min_size, path \\ "/") do
+    data
+    |> Enum.reduce({path, []}, fn
+      {"_size", v}, {current_path, matches} when v >= min_size ->
+        {current_path, matches ++ [{v, current_path}]}
+
+      {"_size", _}, acc ->
+        acc
+
+      {"_files", _}, acc ->
+        acc
+
+      {folder_name, folder}, {current_path, matches} ->
+        submatches = find_dirs(folder, min_size, current_path <> folder_name <> "/")
+        {current_path, matches ++ submatches}
+    end)
+    |> Kernel.elem(1)
+  end
+end
+
+capacity = 70_000_000
+min_required = 30_000_000
+used = size_info["_size"]
+
+size_info
+|> Finder.find_dirs(min_required - (capacity - used))
+|> Map.new()
+|> Enum.min_by(&Kernel.elem(&1, 0))
+|> Kernel.elem(0)
+```
