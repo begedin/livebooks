@@ -1,0 +1,121 @@
+# Untitled notebook
+
+```elixir
+Mix.install([
+  {:kino, "~> 0.7.0"}
+])
+```
+
+## Input
+
+```elixir
+input = Kino.Input.textarea("Input")
+```
+
+## Data
+
+We prepare the input into a data structure for easier computation later. It might not be the most performant approach, but it gives some clarity and insight into the data.
+
+```elixir
+# original input, a list of rows
+original =
+  input
+  |> Kino.Input.read()
+  |> String.split("\n")
+  |> Enum.map(&String.split(&1, "", trim: true))
+  |> Enum.map(fn row -> Enum.map(row, &String.to_integer/1) end)
+
+# a list of columns
+transposed =
+  original
+  |> List.zip()
+  |> Enum.map(&Tuple.to_list/1)
+
+data =
+  original
+  |> Enum.with_index()
+  |> Enum.map(fn {row, row_index} ->
+    row
+    |> Enum.with_index()
+    |> Enum.map(fn {cell, col_index} ->
+      {left, curr_and_right} = Enum.split(row, col_index)
+      right = Enum.drop(curr_and_right, 1)
+
+      column = Enum.at(transposed, col_index)
+      {top, curr_and_bottom} = Enum.split(column, row_index)
+      bottom = Enum.drop(curr_and_bottom, 1)
+
+      %{
+        value: cell,
+        left: left,
+        right: right,
+        top: top,
+        bottom: bottom,
+        # extra bit of info for debugging, we don't actually need it
+        col_index: col_index,
+        row_index: row_index
+      }
+    end)
+  end)
+  |> List.flatten()
+```
+
+## Part 1
+
+With the data structure in place, determining visibility is simple as running a conditional check on each element and counting those that satisfy it.
+
+```elixir
+is_visible = fn data ->
+  # trees at the edge are always visible
+  # other trees are visible if there are no taller 
+  # or equally tall trees in any direction
+  data.left == [] ||
+    data.right == [] ||
+    data.top == [] ||
+    data.bottom == [] ||
+    Enum.max(data.left) < data.value ||
+    Enum.max(data.right) < data.value ||
+    Enum.max(data.top) < data.value ||
+    Enum.max(data.bottom) < data.value
+end
+
+Enum.count(data, &is_visible.(&1))
+```
+
+## Part 2
+
+Again, with the data parsed and in place, all we need to do here is write a function to compute the score for an element, then use it to find the max.
+
+```elixir
+count_visible = fn
+  # right at the edge means scenic score is 0
+  _value, [] ->
+    0
+
+  value, trees ->
+    trees
+    |> Enum.take_while(&(&1 < value))
+    |> Enum.count()
+    # Maybe we reached the edge here, or maybe we 
+    # reached a tree that blocked the view.
+    # We add + 1 for the tree, then make sure we 
+    # don't return more than total count of trees.
+    |> Kernel.+(1)
+    |> Kernel.min(length(trees))
+end
+
+scenic_score = fn data ->
+  # we have to move in the opposite direction for these two
+  trees_left = count_visible.(data.value, data.left |> Enum.reverse())
+  trees_top = count_visible.(data.value, data.top |> Enum.reverse())
+
+  trees_right = count_visible.(data.value, data.right)
+  trees_bottom = count_visible.(data.value, data.bottom)
+
+  trees_left * trees_right * trees_top * trees_bottom
+end
+
+data
+|> Enum.map(&scenic_score.(&1))
+|> Enum.max()
+```
