@@ -1,0 +1,174 @@
+# day-9
+
+```elixir
+Mix.install([
+  {:kino, "~> 0.7.0"}
+])
+```
+
+## Input
+
+```elixir
+input = Kino.Input.textarea("Input")
+```
+
+## Data
+
+```elixir
+moves =
+  input
+  |> Kino.Input.read()
+  |> String.split("\n", trim: true)
+  |> Enum.map(fn move ->
+    [dir, steps] = String.split(move, " ", trim: true)
+    {dir, String.to_integer(steps)}
+  end)
+```
+
+## Logic
+
+All logic is contained within a module. We can call `Traveler.travel` for a normal run, or `Traveler.debug` for a run where the board is printed after every move.
+
+The way this was done was, for part 1, an implementation of just a head and tail was written.
+
+Once part 2 was introduced, the implementation was generalized to support a list of knots.
+
+```elixir
+defmodule Traveler do
+  @doc "Run all the moves and return the end result"
+  def travel(moves, knots) when is_list(moves) and knots > 1 do
+    Enum.reduce(moves, initial(knots - 1), &perform_move/2)
+  end
+
+  @doc """
+  Run all the moves, return the end result 
+  and print the board after every step
+  """
+  def debug(moves, knots) when is_list(moves) and knots > 1 do
+    Enum.reduce(moves, initial(knots - 1), &perform_move(&1, &2, true))
+  end
+
+  defp perform_move(move, acc, debug \\ false)
+
+  # move by one step
+  defp perform_move({dir, 1}, acc, debug) do
+    head = move_head(acc.head, dir)
+
+    {knots, _acc} =
+      Enum.map_reduce(acc.knots, head, fn
+        curr, prev ->
+          knot = move_knot(prev, curr)
+          {knot, knot}
+      end)
+
+    tail = Enum.at(knots, -1)
+    visited = MapSet.put(acc.visited, {tail.x, tail.y})
+
+    if debug, do: print(%{head: head, knots: knots, visited: visited})
+
+    %{head: head, knots: knots, visited: visited}
+  end
+
+  # move by multiple steps by running the 1 step clause repeatedly
+  defp perform_move({dir, s}, acc, debug) when s > 1 do
+    1..s
+    |> Enum.map(fn _ -> {dir, 1} end)
+    |> Enum.reduce(acc, &perform_move(&1, &2, debug))
+  end
+
+  # Moving the head is completely straightforward. 
+  # Just modify the appropriate coordinate by 1.
+  defp move_head(%{x: x, y: y}, "U"), do: %{x: x, y: y + 1}
+  defp move_head(%{x: x, y: y}, "D"), do: %{x: x, y: y - 1}
+  defp move_head(%{x: x, y: y}, "L"), do: %{x: x - 1, y: y}
+  defp move_head(%{x: x, y: y}, "R"), do: %{x: x + 1, y: y}
+
+  # Moving the knot is more complicated. We look at distance
+  # from the knot that comes before and perform an appropriate move.
+  defp move_knot(h, t) do
+    x_diff = h.x - t.x
+    y_diff = h.y - t.y
+
+    cond do
+      # we are too far on both the x and y axis
+      abs(x_diff) > 1 && abs(y_diff) > 1 ->
+        x_move = floor(abs(x_diff) / x_diff)
+        y_move = floor(abs(y_diff) / y_diff)
+        %{x: t.x + x_move, y: t.y + y_move}
+
+      # we are too far on just the x axis
+      abs(x_diff) > 1 ->
+        x_move = floor(abs(x_diff) / x_diff)
+        %{x: t.x + x_move, y: h.y}
+
+      # we are too far on just the y axis
+      abs(y_diff) > 1 ->
+        y_move = floor(abs(y_diff) / y_diff)
+        %{x: h.x, y: t.y + y_move}
+
+      # we are adjacent to the next knot
+      true ->
+        t
+    end
+  end
+
+  # Setup initial state of the board.
+  # The head and all the knots are at {0,0} and
+  # this coordinate is considered visited.
+  defp initial(knot_count) do
+    %{
+      visited: MapSet.new([{0, 0}]),
+      head: %{x: 0, y: 0},
+      knots: Enum.map(1..knot_count, fn _ -> %{x: 0, y: 0} end)
+    }
+  end
+
+  @doc """
+  Print the contents of the board in a 2d grid
+  """
+  def print(%{head: head, knots: knots, visited: visited}) do
+    points =
+      [{head.x, head.y}]
+      |> Enum.concat(Enum.map(knots, &{&1.x, &1.y}))
+      |> Enum.concat(visited)
+
+    xs = Enum.map(points, &Kernel.elem(&1, 0))
+    ys = Enum.map(points, &Kernel.elem(&1, 1))
+
+    Enum.map(Enum.min(ys)..Enum.max(ys), fn y ->
+      Enum.min(xs)..Enum.max(xs)
+      |> Enum.map(fn x ->
+        knot_index = Enum.find_index(knots, fn k -> k.x == x && k.y == y end)
+        visited_index = Enum.find_index(visited, fn {v_x, v_y} -> v_x == x && v_y == y end)
+
+        cond do
+          x == head.x && y == head.y -> "H"
+          knot_index != nil -> "#{knot_index + 1}"
+          visited_index != nil -> "#"
+          true -> "."
+        end
+      end)
+      |> Enum.join("")
+    end)
+    |> Enum.reverse()
+    |> Enum.join("\n")
+    |> IO.puts()
+
+    IO.puts("\n")
+  end
+end
+```
+
+## Part 1
+
+```elixir
+data = Traveler.travel(moves, 2)
+Enum.count(data.visited)
+```
+
+## Part 2
+
+```elixir
+data = Traveler.travel(moves, 10)
+Enum.count(data.visited)
+```

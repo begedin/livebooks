@@ -26,10 +26,7 @@ original =
   |> Enum.map(fn row -> Enum.map(row, &String.to_integer/1) end)
 
 # a list of columns
-transposed =
-  original
-  |> List.zip()
-  |> Enum.map(&Tuple.to_list/1)
+transposed = Enum.zip_with(original, & &1)
 
 data =
   original
