@@ -1,0 +1,384 @@
+# day-10
+
+```elixir
+Mix.install([
+  {:kino, "~> 0.7.0"}
+])
+```
+
+## Input
+
+```elixir
+input = Kino.Input.textarea("Input")
+```
+
+## Examples
+
+```elixir
+defmodule Examples do
+  @moduledoc """
+  Holds examples listed in the assignment text
+  """
+  def example_1, do: ["noop", "addx 3", "addx -5"]
+
+  def example_2,
+    do: [
+      "addx 15",
+      "addx -11",
+      "addx 6",
+      "addx -3",
+      "addx 5",
+      "addx -1",
+      "addx -8",
+      "addx 13",
+      "addx 4",
+      "noop",
+      "addx -1",
+      "addx 5",
+      "addx -1",
+      "addx 5",
+      "addx -1",
+      "addx 5",
+      "addx -1",
+      "addx 5",
+      "addx -1",
+      "addx -35",
+      "addx 1",
+      "addx 24",
+      "addx -19",
+      "addx 1",
+      "addx 16",
+      "addx -11",
+      "noop",
+      "noop",
+      "addx 21",
+      "addx -15",
+      "noop",
+      "noop",
+      "addx -3",
+      "addx 9",
+      "addx 1",
+      "addx -3",
+      "addx 8",
+      "addx 1",
+      "addx 5",
+      "noop",
+      "noop",
+      "noop",
+      "noop",
+      "noop",
+      "addx -36",
+      "noop",
+      "addx 1",
+      "addx 7",
+      "noop",
+      "noop",
+      "noop",
+      "addx 2",
+      "addx 6",
+      "noop",
+      "noop",
+      "noop",
+      "noop",
+      "noop",
+      "addx 1",
+      "noop",
+      "noop",
+      "addx 7",
+      "addx 1",
+      "noop",
+      "addx -13",
+      "addx 13",
+      "addx 7",
+      "noop",
+      "addx 1",
+      "addx -33",
+      "noop",
+      "noop",
+      "noop",
+      "addx 2",
+      "noop",
+      "noop",
+      "noop",
+      "addx 8",
+      "noop",
+      "addx -1",
+      "addx 2",
+      "addx 1",
+      "noop",
+      "addx 17",
+      "addx -9",
+      "addx 1",
+      "addx 1",
+      "addx -3",
+      "addx 11",
+      "noop",
+      "noop",
+      "addx 1",
+      "noop",
+      "addx 1",
+      "noop",
+      "noop",
+      "addx -13",
+      "addx -19",
+      "addx 1",
+      "addx 3",
+      "addx 26",
+      "addx -30",
+      "addx 12",
+      "addx -1",
+      "addx 3",
+      "addx 1",
+      "noop",
+      "noop",
+      "noop",
+      "addx -9",
+      "addx 18",
+      "addx 1",
+      "addx 2",
+      "noop",
+      "noop",
+      "addx 9",
+      "noop",
+      "noop",
+      "noop",
+      "addx -1",
+      "addx 2",
+      "addx -37",
+      "addx 1",
+      "addx 3",
+      "noop",
+      "addx 15",
+      "addx -21",
+      "addx 22",
+      "addx -6",
+      "addx 1",
+      "noop",
+      "addx 2",
+      "addx 1",
+      "noop",
+      "addx -10",
+      "noop",
+      "noop",
+      "addx 20",
+      "addx 1",
+      "addx 2",
+      "addx 2",
+      "addx -6",
+      "addx -11",
+      "noop",
+      "noop",
+      "noop"
+    ]
+end
+```
+
+## Data
+
+This implements the entire CRT logic, part 1 and 2.
+
+There are doctests for the examples listed in the task. For the final doctest, we assert the CRT screen is printed correctly. I don't know of a better way to assert the value of a multiline print.
+
+### Part 1
+
+Initial implementation for this was done where the processor wasn't stepping through every cycle and was instead jumping by cycle amount.
+
+Parsing the two instructions was easy enough, so it was a matter of doing the correct initial values and making sure the logic follows the rules.
+
+### Part 2
+
+Updating the screen needed to happen once per cycle, so the part 1 solution was modified to explicitly step through every single cycle.
+
+Once that was done, updating the screen correctly was a matter of figuring out logic around register and screen indices based on cycle.
+
+```elixir
+defmodule CRT do
+  defstruct register: 1,
+            cycles: 1,
+            signals: [],
+            screen: [
+              Enum.map(0..39, fn _ -> "." end),
+              Enum.map(0..39, fn _ -> "." end),
+              Enum.map(0..39, fn _ -> "." end),
+              Enum.map(0..39, fn _ -> "." end),
+              Enum.map(0..39, fn _ -> "." end),
+              Enum.map(0..39, fn _ -> "." end)
+            ]
+
+  @doc """
+  Process a list of instructions
+
+  ## Examples
+
+    iex> Examples.example_1 |> CRT.process() |> Map.take([:register, :cycles])
+    %{register: -1, cycles: 6}
+
+    iex> Examples.example_2 |> CRT.process() |> Map.take([:register, :cycles, :signals, :total])
+    %{
+      register: 17, 
+      cycles: 241,
+      signals: [
+        %{cycle: 20, register: 21, strength: 420}, 
+        %{cycle: 60, register: 19, strength: 1140}, 
+        %{cycle: 100, register: 18, strength: 1800}, 
+        %{cycle: 140, register: 21, strength: 2940}, 
+        %{cycle: 180, register: 16, strength: 2880}, 
+        %{cycle: 220, register: 18, strength: 3960}
+      ],
+      total: 13140
+    }
+  """
+  def process(instructions) do
+    IO.puts("START OF PROGRAM!")
+
+    instructions
+    |> Enum.reduce(%__MODULE__{register: 1, cycles: 1}, fn instruction, crt ->
+      # prints output similar to one in example
+
+      sprite = [crt.register - 1, crt.register, crt.register + 1]
+
+      position =
+        Enum.map(0..39, fn i ->
+          if(i in sprite, do: "#", else: ".")
+        end)
+
+      IO.puts("\nSprite position: #{position}\n")
+
+      IO.puts("Start cycle #{crt.cycles}: begin executing #{instruction}")
+
+      # actual processing
+
+      cost = get_cycles(instruction)
+      cycles = crt.cycles + cost
+
+      # iterate cycle by cycle and update screen
+      screen =
+        Enum.reduce(crt.cycles..(cycles - 1), crt.screen, fn c, s ->
+          update_screen(s, c, crt.register)
+        end)
+
+      # update register based on instruction
+
+      register = parse(instruction, crt.register)
+
+      # maybe track signal level
+
+      signals =
+        case track_signal(crt.cycles, cycles, crt.register, register) do
+          nil -> crt.signals
+          signal -> crt.signals ++ [signal]
+        end
+
+      IO.puts(
+        "End of cycle #{crt.cycles}: " <>
+          "Finish executing #{instruction} (Register X is now #{register})"
+      )
+
+      %{crt | cycles: cycles, screen: screen, register: register, signals: signals}
+    end)
+  end
+
+  defp get_cycles("noop"), do: 1
+  defp get_cycles("addx" <> _), do: 2
+
+  defp parse("noop", register), do: register
+
+  defp parse("addx " <> amount_str, register) do
+    register + String.to_integer(amount_str)
+  end
+
+  # start of next cycle is exactly the signal measuring cycle
+  # so we track the value at the end of processing (start of next cycle)
+  defp track_signal(_, new_c, _, new_r) when new_c == 20 or rem(new_c - 20, 40) == 0 do
+    %{cycle: new_c, register: new_r, strength: new_r * new_c}
+  end
+
+  # fort next two clauses the measuring cycle was during processing of 
+  # current instruction so we track value at the start of processing 
+
+  # this clause is for the cycle 20 measurement
+  defp track_signal(old_c, new_c, old_r, _) when old_c < 20 and new_c > 20 do
+    %{cycle: 20, register: old_r, strength: old_r * 20}
+  end
+
+  # this clause is for all other measurements
+  defp track_signal(old_c, new_c, old_r, _) when div(old_c - 20, 40) != div(new_c - 20, 40) do
+    cycle = div(new_c - 20, 40) * 40 + 20
+    %{cycle: cycle, register: old_r, strength: old_r * cycle}
+  end
+
+  defp track_signal(_, _, _, _), do: nil
+
+  # the assignment doesn' specify what happens when the screen rolls over 
+  # after the first frame, so the function only does updates before we
+  # reach that point
+  defp update_screen(screen, cycles, register) when cycles < 280 do
+    row = cycles |> div(40) |> rem(6)
+    col = rem(cycles, 40) - 1
+
+    screen_row = Enum.at(screen, row)
+    sprite = [register - 1, register, register + 1]
+
+    if col in sprite do
+      new_screen_row = List.replace_at(screen_row, col, "#")
+      IO.puts("During cycle #{cycles}: CRT draws pixel in position #{col}")
+      IO.puts("Current ROW row: #{new_screen_row}")
+      List.replace_at(screen, row, new_screen_row)
+    else
+      screen
+    end
+  end
+
+  defp update_screen(screen, _, _), do: screen
+
+  @doc """
+  Renders CRT screen into text
+
+  This is then intended to be printed either via `IO.puts/1` or `Kernel.inspect/2`.
+
+  ## Examples
+
+    iex> Examples.example_2 |> CRT.process() |> CRT.render() |> inspect(pretty: true)
+    ~S("##..##..##..##..##..##..##..##..##..##..\\n) <>
+     ~S(###...###...###...###...###...###...###.\\n) <>
+     ~S(####....####....####....####....####....\\n) <>
+     ~S(#####.....#####.....#####.....#####.....\\n) <>
+     ~S(######......######......######......###.\\n) <>
+     ~S(#######.......#######.......#######.....")
+  """
+  def render(%CRT{screen: screen}) do
+    screen
+    |> Enum.map(&Enum.join(&1, ""))
+    |> Enum.join("\n")
+  end
+end
+```
+
+## Part 1
+
+```elixir
+input
+|> Kino.Input.read()
+|> String.split("\n")
+|> CRT.process()
+|> Map.get(:signals)
+|> Enum.take(6)
+|> Enum.map(& &1.strength)
+|> Enum.sum()
+```
+
+## Part 2
+
+```elixir
+result =
+  input
+  |> Kino.Input.read()
+  |> String.split("\n")
+  |> CRT.process()
+
+IO.puts("\n ---------- \n")
+
+result
+|> CRT.render()
+|> IO.puts()
+```
