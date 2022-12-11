@@ -1,0 +1,389 @@
+# day-11
+
+```elixir
+Mix.install([
+  {:kino, "~> 0.7.0"}
+])
+```
+
+## Examples
+
+The one example here is the one used by both part 1 and 2.
+
+```elixir
+defmodule Examples do
+  def example_1 do
+    ~S"""
+    Monkey 0:
+      Starting items: 79, 98
+      Operation: new = old * 19
+      Test: divisible by 23
+        If true: throw to monkey 2
+        If false: throw to monkey 3
+
+    Monkey 1:
+      Starting items: 54, 65, 75, 74
+      Operation: new = old + 6
+      Test: divisible by 19
+        If true: throw to monkey 2
+        If false: throw to monkey 0
+
+    Monkey 2:
+      Starting items: 79, 60, 97
+      Operation: new = old * old
+      Test: divisible by 13
+        If true: throw to monkey 1
+        If false: throw to monkey 3
+
+    Monkey 3:
+      Starting items: 74
+      Operation: new = old + 3
+      Test: divisible by 17
+        If true: throw to monkey 0
+        If false: throw to monkey 1
+    """
+  end
+end
+```
+
+## Core
+
+Not really necessary, but I started off with it, so decided to keep it.
+
+```elixir
+defmodule Monkey do
+  defstruct [:id, :items, :operation, :test, :pass, :fail]
+
+  def new(%{id: id, items: items, operation: operation, test: test, pass: pass, fail: fail})
+      when is_integer(id) and is_list(items) and is_tuple(operation) and is_integer(test) and
+             is_integer(pass) and is_integer(fail) do
+    %__MODULE__{id: id, items: items, operation: operation, test: test, pass: pass, fail: fail}
+  end
+end
+```
+
+```elixir
+defmodule MonkeyParser do
+  @doc """
+
+  ## Examples
+
+    iex> MonkeyParser.parse(Examples.example_1)
+    [
+      %Monkey{id: 0, items: [79, 98], operation: {:old, :*, 19}, test: 23, pass: 2, fail: 3},
+      %Monkey{id: 1, items: [54,65,75,74], operation: {:old, :+, 6}, test: 19, pass: 2, fail: 0},
+      %Monkey{id: 2, items: [79,60,97], operation: {:old, :*, :old}, test: 13, pass: 1, fail: 3},
+      %Monkey{id: 3, items: [74], operation: {:old, :+, 3}, test: 17, pass: 0, fail: 1}
+    ]
+  """
+  def parse(input) do
+    input
+    |> String.split("\n\n", trim: true)
+    |> Enum.map(&String.split(&1, "\n", trim: true))
+    |> Enum.map(fn [
+                     id_row,
+                     items_row,
+                     operation_row,
+                     test_row,
+                     test_true_row,
+                     test_false_row
+                   ] ->
+      Monkey.new(%{
+        id: parse_id_row(id_row),
+        items: parse_items_row(items_row),
+        operation: parse_operation_row(operation_row),
+        test: parse_test_row(test_row),
+        pass: parse_test_outcome_row(test_true_row),
+        fail: parse_test_outcome_row(test_false_row)
+      })
+    end)
+  end
+
+  defp parse_id_row(id_row) do
+    [_, id_str, ""] = String.split(id_row, [" ", ":"])
+    String.to_integer(id_str)
+  end
+
+  defp parse_items_row(items_row) do
+    items_row
+    |> String.split(": ")
+    |> Enum.at(-1)
+    |> String.split(", ")
+    |> Enum.map(&String.to_integer/1)
+  end
+
+  defp parse_operation_row(operation_row) do
+    [left, op, right] =
+      operation_row
+      |> String.split(" = ")
+      |> Enum.at(-1)
+      |> String.split(" ")
+
+    {parse_operand(left), parse_operation(op), parse_operand(right)}
+  end
+
+  defp parse_operand("old"), do: :old
+  defp parse_operand(v), do: String.to_integer(v)
+  defp parse_operation("+"), do: :+
+  defp parse_operation("*"), do: :*
+
+  defp parse_test_row(test_row) do
+    test_row
+    |> String.split(": ")
+    |> Enum.at(-1)
+    |> String.split(" by ")
+    |> Enum.at(-1)
+    |> String.to_integer()
+  end
+
+  defp parse_test_outcome_row(row) do
+    row
+    |> String.split(" ")
+    |> Enum.at(-1)
+    |> String.to_integer()
+  end
+end
+```
+
+## Input
+
+```elixir
+input = Kino.Input.textarea("Input")
+```
+
+## Part 1
+
+Difficulty here was understanding that items passed to the next monkey in this round will be inspected by that monkey before the round ends.
+
+We need a separate module for passing logic in part 1 vs part 2, so this is how we approach it.
+
+```elixir
+defmodule MonkeyPasser do
+  require Logger
+
+  @doc """
+  Converting monkeys to a map speeds up lookup and the overall process
+  """
+  def build_state(monkeys) do
+    monkeys
+    |> Enum.map(fn %Monkey{} = monkey ->
+      {
+        monkey.id,
+        %{
+          id: monkey.id,
+          operation: monkey.operation,
+          test: monkey.test,
+          pass: monkey.pass,
+          fail: monkey.fail,
+          items: monkey.items,
+          checks: 0
+        }
+      }
+    end)
+    |> Map.new()
+  end
+
+  @doc """
+  Takes monkeys and number of rounds. 
+  Returns a map of monkeys by id, containing all the data 
+  about each monkey after all the rounds have been executed.
+
+  ## Examples    
+    iex> Examples.example_1() 
+    ...> |> MonkeyParser.parse() 
+    ...> |> MonkeyPasser.pass(20) 
+    ...> |> Map.values()
+    ...> |> Enum.map(&{&1.id, &1.checks})
+    ...> |> Map.new()
+    %{0 => 101, 1 => 95, 2 => 7, 3 => 105}
+  """
+
+  def pass(monkeys, rounds) do
+    Enum.reduce(1..rounds, build_state(monkeys), fn round, state ->
+      Logger.info("Round #{round}")
+      pass_round(state)
+    end)
+  end
+
+  # performs one round of the process
+  defp pass_round(state) do
+    # outer reduce goes thrug monkeys and updates state
+    Enum.reduce(Map.keys(state), state, fn monkey_id, state ->
+      # inner reduce operates on a monkey and goes through it's items
+      monkey = state[monkey_id]
+
+      Enum.reduce(monkey.items, state, fn item, state ->
+        monkey = state[monkey_id]
+
+        # incrase, then decrease worry according to rules
+        item = item |> worry(monkey.operation) |> div(3)
+
+        # update the current monkey
+        monkey = %{
+          monkey
+          | items: Enum.drop(monkey.items, 1),
+            checks: monkey.checks + 1
+        }
+
+        # pass item to other monkey
+        pass_to_id = if rem(item, monkey.test) == 0, do: monkey.pass, else: monkey.fail
+        other = state[pass_to_id]
+        other_items = Enum.concat(other.items, [item])
+        other = %{other | items: other_items}
+
+        state
+        |> Map.put(monkey_id, monkey)
+        |> Map.put(pass_to_id, other)
+      end)
+    end)
+  end
+
+  # first two clauses here normalize to the final clause
+  defp worry(item, {:old, operation, right}) do
+    worry(item, {item, operation, right})
+  end
+
+  defp worry(item, {left, operation, :old}) do
+    worry(item, {left, operation, item})
+  end
+
+  # encoding the operation as `:+` or `:*` allows us to just `apply` it
+  defp worry(_, {left, operation, right}) do
+    apply(Kernel, operation, [left, right])
+  end
+end
+```
+
+```elixir
+input
+|> Kino.Input.read()
+|> MonkeyParser.parse()
+|> MonkeyPasser.pass(20)
+|> Map.values()
+|> Enum.map(& &1.checks)
+|> Enum.sort()
+|> Enum.take(-2)
+|> Enum.reduce(&(&1 * &2))
+```
+
+## Part 2
+
+```elixir
+defmodule MonkeyPasserV2 do
+  require Logger
+
+  @doc """
+  Takes monkeys and number of rounds. 
+  Returns a map of monkeys by id, containing all the data 
+  about each monkey after all the rounds have been executed.
+
+  ## Examples
+    iex> Examples.example_1() 
+    ...> |> MonkeyParser.parse() 
+    ...> |> MonkeyPasserV2.pass(1) 
+    ...> |> Map.values()
+    ...> |> Enum.map(&{&1.id, &1.checks})
+    ...> |> Map.new()
+    %{0 => 2, 1 => 4, 2 => 3, 3 => 6}
+    
+    iex> Examples.example_1() 
+    ...> |> MonkeyParser.parse() 
+    ...> |> MonkeyPasserV2.pass(20) 
+    ...> |> Map.values()
+    ...> |> Enum.map(&{&1.id, &1.checks})
+    ...> |> Map.new()
+    %{0 => 99, 1 => 97, 2 => 8, 3 => 103}
+
+    iex> Examples.example_1() 
+    ...> |> MonkeyParser.parse() 
+    ...> |> MonkeyPasserV2.pass(1000) 
+    ...> |> Map.values()
+    ...> |> Enum.map(&{&1.id, &1.checks})
+    ...> |> Map.new()
+    %{0 => 5204, 1 => 4792, 2 => 199, 3 => 5192}
+  """
+  def pass(monkeys, rounds) do
+    Enum.reduce(1..rounds, MonkeyPasser.build_state(monkeys), fn round, state ->
+      Logger.info("Round #{round}")
+      pass_round(state)
+    end)
+  end
+
+  defp pass_round(state) do
+    # outer reduce goes through all the monkeys and passes state to inner reduce
+    Enum.reduce(Map.keys(state), state, fn monkey_id, state ->
+      # inner reduce goes through all items of a single monkey, 
+      # passing the same state along and updating it
+      monkey = state[monkey_id]
+
+      Enum.reduce(monkey.items, state, fn item, state ->
+        monkey = state[monkey_id]
+
+        # worry function does not compute in V2;
+        # just appends to a list
+        item = worry(item, monkey.operation)
+
+        # the current monkey is updated in the same way as in V1
+        monkey = %{
+          monkey
+          | items: Enum.drop(monkey.items, 1),
+            checks: monkey.checks + 1
+        }
+
+        # this is when we compute the rem to check which monkey to pass to
+        pass_to_id =
+          case compute_rem(item, monkey.test) do
+            0 -> monkey.pass
+            _ -> monkey.fail
+          end
+
+        # pass to monkey, same as before
+        other = state[pass_to_id]
+        # Special note here: 
+        # Using `Enum.concat` instead causes the livebook to disconnect
+        # at around 3000 items, give or take.
+        other_items = [item | Enum.reverse(other.items)] |> Enum.reverse()
+        other = %{other | items: other_items}
+
+        state
+        |> Map.put(monkey_id, monkey)
+        |> Map.put(pass_to_id, other)
+      end)
+    end)
+  end
+
+  # worry function in V2 simply appends the instruction to 
+  # a list
+  defp worry(item, {:old, operation, right}) do
+    [{operation, right} | item |> List.wrap() |> Enum.reverse()] |> Enum.reverse()
+  end
+
+  # We compute_rem while keeping numbers small by relying on 
+  # a property of the modul operand:
+  # `(a + b) % c === ((a % c) + (b % c)) % c`
+  # `(a * b) % c === ((a % c) * (b % c)) % c`
+  defp compute_rem([initial | rest], test) do
+    rest
+    |> Enum.reduce(initial, fn
+      {:+, :old}, acc -> acc + rem(acc, test)
+      {:+, right}, acc -> acc + rem(right, test)
+      {:*, :old}, acc -> acc * rem(acc, test)
+      {:*, right}, acc -> acc * rem(right, test)
+    end)
+    |> rem(test)
+  end
+end
+```
+
+```elixir
+# takes sometimes up to an hour to execute, but executes
+input
+|> Kino.Input.read()
+|> MonkeyParser.parse()
+|> MonkeyPasserV2.pass(10000)
+|> Map.values()
+|> Enum.map(& &1.checks)
+|> Enum.sort()
+|> Enum.take(-2)
+|> Enum.reduce(&(&1 * &2))
+```
