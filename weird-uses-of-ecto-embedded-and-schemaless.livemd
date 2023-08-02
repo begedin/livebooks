@@ -1,0 +1,125 @@
+# Weird uses of ecto embedded and schemaless
+
+```elixir
+Mix.install([
+  {:ecto, "3.10.3"}
+])
+```
+
+## Section
+
+Embedded schemas are generally used for jsonb columns
+
+However, they can also be used for much more such as params scrubbing and prevalidation.
+
+```elixir
+defmodule Login do
+  use Ecto.Schema
+
+  alias Ecto.Changeset
+
+  @primary_key false
+  embedded_schema do
+    field(:email, :string)
+    field(:password, :string)
+    field(:remember_me, :boolean)
+    field(:age, :integer)
+  end
+
+  defp traverse_errors(%Changeset{} = changeset) do
+    Changeset.traverse_errors(changeset, fn {msg, opts} ->
+      Enum.reduce(opts, msg, fn {key, value}, acc ->
+        String.replace(acc, "%{#{key}}", to_string(value))
+      end)
+    end)
+  end
+
+  def scrub_params(%{} = params) do
+    case Changeset.cast(%__MODULE__{}, params, [:email, :password, :remember_me, :age]) do
+      %{valid?: true} = c -> {:ok, Changeset.apply_changes(c)}
+      %{valid?: false} = c -> {:error, traverse_errors(c)}
+    end
+  end
+end
+```
+
+We can use embedded schemas to take api params and clean them up a bit
+
+```elixir
+[
+  Login.scrub_params(%{"email" => "foo@example.com"}),
+  Login.scrub_params(%{"email" => "foo@example.com", "password" => "pass1"}),
+  Login.scrub_params(%{"email" => "foo@example.com", "password" => 123}),
+  Login.scrub_params(%{
+    "email" => "foo@example.com",
+    "password" => "pass1",
+    "remember_me" => "invalid"
+  })
+]
+```
+
+It automatically ensures correct types are passed in. It can even coerce strings to numbers, for example
+
+```elixir
+Login.scrub_params(%{"age" => "55"})
+```
+
+We can also add all the basic validation without needing to go into the db and actual schema records.
+
+```elixir
+alias Ecto.Changeset
+
+%Login{}
+|> Changeset.cast(
+  %{
+    "email" => nil,
+    "password" => 123,
+    "remember_me" => false,
+    "age" => 17
+  },
+  [:email, :password, :remember_me, :age]
+)
+|> Changeset.validate_required([:email, :password, :age])
+|> Changeset.validate_acceptance(:remember_me)
+|> Changeset.validate_number(:age, greater_than_or_equal_to: 18)
+```
+
+This is great for validating complex forms that might not necessarily have a backing db record. Something to kick start a long running process, for example
+
+## But this means a huge number of schemas!
+
+Sure, but we can reduce that down by using schemaless changesets
+
+https://hexdocs.pm/ecto/Ecto.Changeset.html#module-schemaless-changesets
+
+```elixir
+defaults = %{username: nil, password: nil, tos_accepted: nil}
+types = %{username: :string, password: :string, tos_accepted: :boolean}
+params = %{username: "joe", password: nil, tos_accepted: false}
+fields = Map.keys(types)
+
+{defaults, types}
+|> Changeset.cast(params, fields)
+|> Changeset.validate_required([:username, :password])
+|> Changeset.validate_acceptance(:tos_accepted)
+```
+
+## Do we need this for every API?
+
+Not really. If se use Open API, then it kind of does that for us, though potentially not fully.
+
+## Is TypedStruct an alternative?
+
+TypedStruct does not provide any extra features we don't already have in elixir. It's syntactic sugar to define a struct (with enforced keys) and a typespec for it in one macro, one call, nothing more.
+
+It will not provide any validation capabilities that ecto changesets do for us.
+
+You get a bit less boiler plate at the cost of less clarity (it's not core, less known) and at the cost of the scrub/validation feature and adding an extra dependency (you probably already have ecto as a dependency).
+
+If you really care about reducing boiler plate and are using it to enforce strictness in code, it's a fine option.
+
+If you are cleaning external input in any way and it's not being handled by something like Open API schemas, I would go with Ecto.
+
+<!-- livebook:{"break_markdown":true} -->
+
+
