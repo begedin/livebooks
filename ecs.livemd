@@ -17,9 +17,8 @@
 * takes all entities that have a specific sets of components on them and updates data an those components
 * movement system takes all entities with position and `velocity`, updates position based on `velocity`
 
-## What does that look like?
+<!-- livebook:{"break_markdown":true} -->
 
-````elixir
 ```Elixir
 new_state =
   old_state
@@ -28,16 +27,13 @@ new_state =
   |> Snake.Systems.Collision.run()
   |> Snake.Systems.FoodEating.run()
   |> Snake.Systems.FoodSpawning.run()
-```
 
 # and then just render the state
-````
+```
 
-## Isn't that perfect for elixir?
+## What does that look like?
 
-Yes, yes it is
-
-Demo time!
+## Demo time
 
 ## Should we use live view?
 
