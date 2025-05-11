@@ -1,0 +1,57 @@
+# Game dev in elixir with ECS
+
+## What is Entity-Component-System (ECS)?
+
+### Entity
+
+* just an id
+
+### Component
+
+* just data
+* `position, velocity, animation, texture, health, damage, attack, lighting_damage`, ...
+
+### System
+
+* logic
+* takes all entities that have a specific sets of components on them and updates data an those components
+* movement system takes all entities with position and `velocity`, updates position based on `velocity`
+
+## What does that look like?
+
+````elixir
+```Elixir
+new_state =
+  old_state
+  |> Snake.Systems.Movement.run()
+  |> Snake.Systems.Animation.run()
+  |> Snake.Systems.Collision.run()
+  |> Snake.Systems.FoodEating.run()
+  |> Snake.Systems.FoodSpawning.run()
+```
+
+# and then just render the state
+````
+
+## Isn't that perfect for elixir?
+
+Yes, yes it is
+
+Demo time!
+
+## Should we use live view?
+
+* For hobby or generally simple/casual games? Sure, why not?
+* There's input lag
+* Inefficient
+* Great for multiplayer
+* Partially fixed by more JS
+
+## What else can we do?
+
+<!-- livebook:{"force_markdown":true} -->
+
+```elixir
+:wx
+:gl
+```
