@@ -1,3 +1,5 @@
+<!-- livebook:{"file_entries":[{"name":"qrcode_github.com.png","type":"attachment"}]} -->
+
 # Game dev in elixir with ECS
 
 ## What is Entity-Component-System (ECS)?
@@ -14,10 +16,12 @@
 ### System
 
 * logic
-* takes all entities that have a specific sets of components on them and updates data an those components
-* movement system takes all entities with position and `velocity`, updates position based on `velocity`
+* takes all entities with components x,y,z; updates data
+* `MovementSystem`
+  * takes all entities with `position` and `velocity`
+  * updates `position` based on `velocity`
 
-<!-- livebook:{"break_markdown":true} -->
+## What does that look like?
 
 ```Elixir
 new_state =
@@ -31,8 +35,6 @@ new_state =
 # and then just render the state
 ```
 
-## What does that look like?
-
 ## Demo time
 
 ## Should we use live view?
@@ -43,7 +45,7 @@ new_state =
 * Great for multiplayer
 * Partially fixed by more JS
 
-## What else can we do?
+## If not liveview, what?
 
 <!-- livebook:{"force_markdown":true} -->
 
@@ -51,3 +53,11 @@ new_state =
 :wx
 :gl
 ```
+
+## Thank you!
+
+https://github.com/begedin/livepixel
+
+<!-- livebook:{"break_markdown":true} -->
+
+![](files/qrcode_github.com.png)
